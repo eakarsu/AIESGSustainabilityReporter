@@ -35,6 +35,7 @@ const aiLinks = [
   { path: '/ai/energy', label: 'Energy Audit' },
   { path: '/ai/social', label: 'Social Measurement' },
   { path: '/ai/governance', label: 'Governance Monitoring' },
+  { path: '/ai/advanced', label: 'Advanced (Score / Deadlines / Peers)' },
 ];
 
 export default function Layout({ user, onLogout, children }) {

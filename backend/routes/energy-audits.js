@@ -13,11 +13,27 @@ const COLUMNS = [
 // GET all records
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC`,
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+    const cnt = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM ${TABLE} WHERE user_id = $1`,
       [req.user.id]
     );
-    res.json(result.rows);
+    const total = cnt.rows[0]?.c || 0;
+    const result = await pool.query(
+      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+      },
+    });
   } catch (err) {
     console.error(`Error fetching ${TABLE}:`, err.message);
     res.status(500).json({ error: 'Internal server error' });

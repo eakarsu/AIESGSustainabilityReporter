@@ -10,14 +10,33 @@ const COLUMNS = [
   'overall_rating', 'status', 'summary'
 ];
 
-// GET all records
+// GET all records (with pagination)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC`,
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM ${TABLE} WHERE user_id = $1`,
       [req.user.id]
     );
-    res.json(result.rows);
+    const total = parseInt(countResult.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (err) {
     console.error(`Error fetching ${TABLE}:`, err.message);
     res.status(500).json({ error: 'Internal server error' });
@@ -41,9 +60,16 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// POST create new record
+// POST create new record (with input validation)
 router.post('/', authenticateToken, async (req, res) => {
   try {
+    // Input validation
+    const errors = [];
+    if (!req.body.report_title || String(req.body.report_title).trim() === '') errors.push('report_title is required');
+    if (!req.body.reporting_period || String(req.body.reporting_period).trim() === '') errors.push('reporting_period is required');
+    if (!req.body.framework || String(req.body.framework).trim() === '') errors.push('framework is required');
+    if (errors.length > 0) return res.status(400).json({ error: 'Validation failed', details: errors });
+
     const values = COLUMNS.map(col => req.body[col]);
     const placeholders = COLUMNS.map((_, i) => `$${i + 1}`).join(', ');
     const colNames = COLUMNS.join(', ');
