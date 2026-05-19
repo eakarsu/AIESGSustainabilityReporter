@@ -84,6 +84,14 @@ export default function Layout({ user, onLogout, children }) {
             Dashboard
           </Link>
 
+          <Link
+            to="/custom-views"
+            className={linkClass('/custom-views')}
+            onClick={() => setSidebarOpen(false)}
+          >
+            ESG Views
+          </Link>
+
           <div className="nav-section">
             <span className="nav-section-title">ESG Tools</span>
             {crudLinks.map((link) => (
