@@ -10,14 +10,33 @@ const COLUMNS = [
   'industry_sector', 'methodology', 'status'
 ];
 
-// GET all records
+// GET all records (with pagination)
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC`,
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM ${TABLE} WHERE user_id = $1`,
       [req.user.id]
     );
-    res.json(result.rows);
+    const total = parseInt(countResult.rows[0].count);
+
+    const result = await pool.query(
+      `SELECT * FROM ${TABLE} WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+      [req.user.id, limit, offset]
+    );
+
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (err) {
     console.error(`Error fetching ${TABLE}:`, err.message);
     res.status(500).json({ error: 'Internal server error' });

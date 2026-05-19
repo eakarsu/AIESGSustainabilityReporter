@@ -5,7 +5,11 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CrudPage from './pages/CrudPage';
 import AIPage from './pages/AIPage';
+import AINewPage from './pages/AINewPage';
 import { login as apiLogin } from './services/api';
+
+import Batch03Features from './pages/Batch03Features';
+import CustomViewsPage from './pages/CustomViewsPage';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -47,6 +51,8 @@ export default function App() {
     <BrowserRouter>
       <Layout user={user} onLogout={handleLogout}>
         <Routes>
+          <Route path="/batch03" element={<Batch03Features />} />
+          <Route path="/custom-views" element={<CustomViewsPage />} />
           <Route path="/" element={<Dashboard />} />
 
           {/* CRUD Pages */}
@@ -82,6 +88,7 @@ export default function App() {
           <Route path="/ai/energy" element={<AIPage type="audit-energy" title="AI Energy Audit" />} />
           <Route path="/ai/social" element={<AIPage type="measure-social" title="AI Social Measurement" />} />
           <Route path="/ai/governance" element={<AIPage type="monitor-governance" title="AI Governance Monitoring" />} />
+          <Route path="/ai/advanced" element={<AINewPage />} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

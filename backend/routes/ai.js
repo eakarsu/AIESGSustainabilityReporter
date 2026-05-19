@@ -3,6 +3,38 @@ const router = express.Router();
 const fetch = require('node-fetch');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
+const { aiRateLimiter } = require('../middleware/rateLimiter');
+
+// ---------------------------------------------------------------------------
+// Helper: persist AI analysis result to ai_analyses table
+// ---------------------------------------------------------------------------
+
+async function persistAnalysis(entityType, entityId, analysisType, resultText, framework, userId) {
+  try {
+    await pool.query(
+      `INSERT INTO ai_analyses (entity_type, entity_id, analysis_type, result_text, framework, user_id, model_used)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        entityType,
+        entityId || null,
+        analysisType,
+        resultText,
+        framework || null,
+        userId || null,
+        process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022',
+      ]
+    );
+  } catch (err) {
+    console.error('Failed to persist AI analysis:', err.message);
+  }
+}
+
+// Cap prompt size to keep request token budget bounded.
+function capPrompt(text, maxChars = 12000) {
+  if (typeof text !== 'string') return text;
+  if (text.length <= maxChars) return text;
+  return text.slice(0, maxChars) + `\n…[truncated ${text.length - maxChars} chars]`;
+}
 
 // ---------------------------------------------------------------------------
 // OpenRouter helper
@@ -14,11 +46,13 @@ async function callOpenRouter(prompt, options = {}) {
     throw new Error('OPENROUTER_API_KEY is not configured');
   }
 
-  const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-haiku-4.5';
+  const model = process.env.OPENROUTER_MODEL || 'anthropic/claude-3-5-sonnet-20241022';
+
+  const cappedPrompt = capPrompt(prompt);
 
   const body = {
     model,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content: cappedPrompt }],
     max_tokens: options.maxTokens || 2048,
     temperature: options.temperature ?? 0.3,
   };
@@ -185,7 +219,7 @@ const TABLE_CONFIG = {
 // GET /dashboard-stats  –  aggregated stats from all 15 tables
 // ---------------------------------------------------------------------------
 
-router.get('/dashboard-stats', authenticateToken, async (req, res) => {
+router.get('/dashboard-stats', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const stats = {};
 
@@ -233,7 +267,7 @@ async function fetchRecord(table, id, userId) {
 // POST /analyze-esg-report
 // ---------------------------------------------------------------------------
 
-router.post('/analyze-esg-report', authenticateToken, async (req, res) => {
+router.post('/analyze-esg-report', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -256,6 +290,8 @@ Format as a professional advisory report with clear sections and bullet points.`
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('esg_reports', id, 'analyze-esg-report', result.analysis, record.framework, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -271,7 +307,7 @@ Format as a professional advisory report with clear sections and bullet points.`
 // POST /analyze-carbon
 // ---------------------------------------------------------------------------
 
-router.post('/analyze-carbon', authenticateToken, async (req, res) => {
+router.post('/analyze-carbon', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -295,6 +331,8 @@ Format as a professional carbon management advisory report with clear sections a
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('carbon_footprints', id, 'analyze-carbon', result.analysis, 'GHG Protocol', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -310,7 +348,7 @@ Format as a professional carbon management advisory report with clear sections a
 // POST /analyze-sustainability
 // ---------------------------------------------------------------------------
 
-router.post('/analyze-sustainability', authenticateToken, async (req, res) => {
+router.post('/analyze-sustainability', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -334,6 +372,8 @@ Format as a professional sustainability performance report with clear sections a
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('sustainability_metrics', id, 'analyze-sustainability', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -349,7 +389,7 @@ Format as a professional sustainability performance report with clear sections a
 // POST /check-compliance
 // ---------------------------------------------------------------------------
 
-router.post('/check-compliance', authenticateToken, async (req, res) => {
+router.post('/check-compliance', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -373,6 +413,8 @@ Format as a professional regulatory compliance advisory report with clear sectio
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('regulatory_compliance', id, 'check-compliance', result.analysis, record.regulation_name || null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -388,7 +430,7 @@ Format as a professional regulatory compliance advisory report with clear sectio
 // POST /analyze-supply-chain
 // ---------------------------------------------------------------------------
 
-router.post('/analyze-supply-chain', authenticateToken, async (req, res) => {
+router.post('/analyze-supply-chain', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -413,6 +455,8 @@ Format as a professional supply chain sustainability advisory report with clear 
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('supply_chain_esg', id, 'analyze-supply-chain', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -428,7 +472,7 @@ Format as a professional supply chain sustainability advisory report with clear 
 // POST /assess-risk
 // ---------------------------------------------------------------------------
 
-router.post('/assess-risk', authenticateToken, async (req, res) => {
+router.post('/assess-risk', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -453,6 +497,8 @@ Format as a professional ESG risk advisory report with clear sections, risk rati
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('risk_assessments', id, 'assess-risk', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -468,7 +514,7 @@ Format as a professional ESG risk advisory report with clear sections, risk rati
 // POST /detect-greenwashing
 // ---------------------------------------------------------------------------
 
-router.post('/detect-greenwashing', authenticateToken, async (req, res) => {
+router.post('/detect-greenwashing', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -493,6 +539,8 @@ Format as a professional greenwashing risk advisory report with clear sections a
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('greenwashing_checks', id, 'detect-greenwashing', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -508,7 +556,7 @@ Format as a professional greenwashing risk advisory report with clear sections a
 // POST /build-stakeholder-report
 // ---------------------------------------------------------------------------
 
-router.post('/build-stakeholder-report', authenticateToken, async (req, res) => {
+router.post('/build-stakeholder-report', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -533,6 +581,8 @@ Format as a professional stakeholder reporting advisory with clear sections and 
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('stakeholder_reports', id, 'build-stakeholder-report', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -548,7 +598,7 @@ Format as a professional stakeholder reporting advisory with clear sections and 
 // POST /validate-data
 // ---------------------------------------------------------------------------
 
-router.post('/validate-data', authenticateToken, async (req, res) => {
+router.post('/validate-data', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -573,6 +623,8 @@ Format as a professional data quality advisory report with clear sections and bu
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('data_validations', id, 'validate-data', result.analysis, null, req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -588,7 +640,7 @@ Format as a professional data quality advisory report with clear sections and bu
 // POST /analyze-climate
 // ---------------------------------------------------------------------------
 
-router.post('/analyze-climate', authenticateToken, async (req, res) => {
+router.post('/analyze-climate', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -613,6 +665,8 @@ Format as a professional climate scenario advisory report with clear sections an
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('climate_scenarios', id, 'analyze-climate', result.analysis, 'TCFD', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -628,7 +682,7 @@ Format as a professional climate scenario advisory report with clear sections an
 // POST /track-biodiversity
 // ---------------------------------------------------------------------------
 
-router.post('/track-biodiversity', authenticateToken, async (req, res) => {
+router.post('/track-biodiversity', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -653,6 +707,8 @@ Format as a professional biodiversity impact advisory report with clear sections
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('biodiversity_impacts', id, 'track-biodiversity', result.analysis, 'TNFD', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -668,7 +724,7 @@ Format as a professional biodiversity impact advisory report with clear sections
 // POST /optimize-water
 // ---------------------------------------------------------------------------
 
-router.post('/optimize-water', authenticateToken, async (req, res) => {
+router.post('/optimize-water', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -693,6 +749,8 @@ Format as a professional water management advisory report with clear sections an
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('water_usage', id, 'optimize-water', result.analysis, 'AWS', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -708,7 +766,7 @@ Format as a professional water management advisory report with clear sections an
 // POST /audit-energy
 // ---------------------------------------------------------------------------
 
-router.post('/audit-energy', authenticateToken, async (req, res) => {
+router.post('/audit-energy', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -733,6 +791,8 @@ Format as a professional energy audit advisory report with clear sections and bu
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('energy_audits', id, 'audit-energy', result.analysis, 'ISO 50001', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -748,7 +808,7 @@ Format as a professional energy audit advisory report with clear sections and bu
 // POST /measure-social
 // ---------------------------------------------------------------------------
 
-router.post('/measure-social', authenticateToken, async (req, res) => {
+router.post('/measure-social', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -773,6 +833,8 @@ Format as a professional social impact advisory report with clear sections and b
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('social_impacts', id, 'measure-social', result.analysis, 'SROI', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -788,7 +850,7 @@ Format as a professional social impact advisory report with clear sections and b
 // POST /monitor-governance
 // ---------------------------------------------------------------------------
 
-router.post('/monitor-governance', authenticateToken, async (req, res) => {
+router.post('/monitor-governance', authenticateToken, aiRateLimiter, async (req, res) => {
   try {
     const { id } = req.body;
     if (!id) return res.status(400).json({ error: 'id is required' });
@@ -813,6 +875,8 @@ Format as a professional governance advisory report with clear sections and bull
 
     const result = await callOpenRouter(prompt);
 
+    await persistAnalysis('governance_compliance', id, 'monitor-governance', result.analysis, 'OECD', req.user.id);
+
     res.json({
       ...result,
       timestamp: new Date().toISOString(),
@@ -821,6 +885,59 @@ Format as a professional governance advisory report with clear sections and bull
   } catch (err) {
     console.error('Error monitoring governance:', err.message);
     res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /ai-analyses - list with pagination, filter by entity_type and framework
+// ---------------------------------------------------------------------------
+
+router.get('/analyses', authenticateToken, async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const offset = (page - 1) * limit;
+    const { entity_type, framework } = req.query;
+
+    let whereClause = 'WHERE user_id = $1';
+    const params = [req.user.id];
+
+    if (entity_type) {
+      params.push(entity_type);
+      whereClause += ` AND entity_type = $${params.length}`;
+    }
+    if (framework) {
+      params.push(framework);
+      whereClause += ` AND framework = $${params.length}`;
+    }
+
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM ai_analyses ${whereClause}`,
+      params
+    );
+    const total = parseInt(countResult.rows[0].count);
+
+    params.push(limit, offset);
+    const result = await pool.query(
+      `SELECT id, entity_type, entity_id, analysis_type, framework, created_at,
+              LEFT(result_text, 300) AS result_preview
+       FROM ai_analyses ${whereClause}
+       ORDER BY created_at DESC LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+
+    res.json({
+      data: result.rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching AI analyses:', err.message);
+    res.status(500).json({ error: 'Internal server error' });
   }
 });
 
