@@ -94,6 +94,7 @@ app.use('/api/esg-linked-financing', require('./routes/esgLinkedFinancing'));
 app.use('/api/investor-relations', require('./routes/investorRelations'));
 app.use('/api/regulatory-tracker', require('./routes/regulatoryTracker'));
 app.use('/api/circular-economy', require('./routes/circularEconomy'));
+app.use('/api/assurance-readiness', require('./routes/assuranceReadiness'));
 
 // Custom views (mount BEFORE 404 / error handlers)
 app.use('/api/custom-views', require('./routes/customViews'));

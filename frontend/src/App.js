@@ -10,6 +10,12 @@ import { login as apiLogin } from './services/api';
 
 import Batch03Features from './pages/Batch03Features';
 import CustomViewsPage from './pages/CustomViewsPage';
+import AssuranceReadinessPage from './pages/AssuranceReadinessPage';
+
+import CodexCustomVizFeature from './pages/CodexCustomVizFeature';
+import CodexOperationsFeature from './pages/CodexOperationsFeature';
+
+import TimelineView from './pages/TimelineView';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -51,8 +57,13 @@ export default function App() {
     <BrowserRouter>
       <Layout user={user} onLogout={handleLogout}>
         <Routes>
+        <Route path="/insights/timeline" element={<TimelineView />} />
+        <Route path="/codex/custom-viz" element={<CodexCustomVizFeature />} />
+        <Route path="/codex/operations" element={<CodexOperationsFeature />} />
+
           <Route path="/batch03" element={<Batch03Features />} />
           <Route path="/custom-views" element={<CustomViewsPage />} />
+          <Route path="/assurance-readiness" element={<AssuranceReadinessPage />} />
           <Route path="/" element={<Dashboard />} />
 
           {/* CRUD Pages */}

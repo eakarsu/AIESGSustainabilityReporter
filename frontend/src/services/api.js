@@ -64,6 +64,15 @@ export async function deleteItem(resource, id) {
   return handleResponse(res);
 }
 
+export async function assuranceReadinessScore(body) {
+  const res = await fetch(`${BASE_URL}/api/assurance-readiness/score`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body || {}),
+  });
+  return handleResponse(res);
+}
+
 // ---------------------------------------------------------------------------
 // AI Analysis Endpoints - POST with { id } in body
 // ---------------------------------------------------------------------------
