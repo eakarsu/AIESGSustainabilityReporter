@@ -1,0 +1,2 @@
+const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const path=require('node:path');
+test('governed disclosure migration includes tenant, idempotency, audit, and integration contracts',()=>{const sql=fs.readFileSync(path.join(__dirname,'../migrations/002_governed_disclosures.sql'),'utf8');for(const term of ['tenant_id','UNIQUE (tenant_id, external_key)','esg_workflow_events','esg_integration_inbox','CHECK (status IN'])assert.ok(sql.includes(term),term);});

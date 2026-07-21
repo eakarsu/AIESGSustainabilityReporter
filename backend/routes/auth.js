@@ -8,42 +8,33 @@ const { getJwtSecret } = require('../middleware/auth');
 
 const router = express.Router();
 
-// Idempotent password reset table
-pool.query(`
-  CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    token VARCHAR(128) NOT NULL,
-    expires_at TIMESTAMP NOT NULL,
-    used BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
-  )
-`).catch(() => {});
-
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, name, role, industry_sector } = req.body;
-    if (!email || !password || !name) return res.status(400).json({ error: 'email, password, name required' });
+    if (process.env.ALLOW_SELF_REGISTRATION !== 'true' || process.env.NODE_ENV === 'production') {
+      return res.status(403).json({ error: 'Self-registration is disabled; use an administrator-issued invitation' });
+    }
+    const { email, password, name, industry_sector, organization_id } = req.body;
+    if (!email || !password || !name || !organization_id) return res.status(400).json({ error: 'email, password, name and organization_id required' });
     if (String(password).length < 8) return res.status(400).json({ error: 'password must be at least 8 characters' });
-    const safeRole = ['admin', 'reporter', 'auditor'].includes(role) ? role : 'reporter';
+    const safeRole = 'reporter';
     const hashed = await bcrypt.hash(password, 10);
 
     // Some seed schemas may include an industry_sector column; tolerate either.
     let result;
     try {
       result = await pool.query(
-        'INSERT INTO users (email, password, name, role, industry_sector) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role',
-        [email, hashed, name, safeRole, industry_sector || null]
+        'INSERT INTO users (email, password, name, role, industry_sector, tenant_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, email, name, role, tenant_id',
+        [email, hashed, name, safeRole, industry_sector || null, organization_id]
       );
     } catch {
       result = await pool.query(
-        'INSERT INTO users (email, password, name, role) VALUES ($1, $2, $3, $4) RETURNING id, email, name, role',
-        [email, hashed, name, safeRole]
+        'INSERT INTO users (email, password, name, role, tenant_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, email, name, role, tenant_id',
+        [email, hashed, name, safeRole, organization_id]
       );
     }
     const user = result.rows[0];
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, getJwtSecret(), { expiresIn: '24h' });
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role, tenant_id: user.tenant_id }, getJwtSecret(), { expiresIn: '24h' });
     res.status(201).json({ token, user });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Email already exists' });
@@ -79,6 +70,7 @@ router.post('/login', async (req, res) => {
         id: user.id,
         email: user.email,
         role: user.role,
+        tenant_id: user.tenant_id,
       },
       getJwtSecret(),
       { expiresIn: '24h' }
@@ -91,6 +83,7 @@ router.post('/login', async (req, res) => {
         email: user.email,
         name: user.name,
         role: user.role,
+        tenant_id: user.tenant_id,
       },
     });
   } catch (err) {
@@ -111,7 +104,7 @@ router.post('/forgot-password', async (req, res) => {
           `INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, NOW() + INTERVAL '1 hour')`,
           [u.rows[0].id, token]
         );
-        if (process.env.NODE_ENV !== 'production') {
+        if (process.env.NODE_ENV !== 'production' && process.env.EXPOSE_DEMO_TOKENS === 'true') {
           return res.json({ message: 'Reset token created', token });
         }
       }
@@ -145,14 +138,17 @@ router.post('/reset-password', async (req, res) => {
 
 // POST /api/auth/refresh
 router.post('/refresh', authMiddleware, async (req, res) => {
-  const { id, email, role } = req.user;
-  const token = jwt.sign({ id, email, role }, getJwtSecret(), { expiresIn: '24h' });
+  const { id, email, role, tenant_id } = req.user;
+  const token = jwt.sign({ id, email, role, tenant_id }, getJwtSecret(), { expiresIn: '24h' });
   res.json({ token });
 });
 
 // GET /api/auth/me
 router.get('/me', authMiddleware, async (req, res) => {
   try {
+    // tenant_id is introduced by an additive migration. Query the durable
+    // core identity columns so session verification remains available during
+    // a rolling migration, and take tenant scope only from the verified JWT.
     const result = await pool.query(
       'SELECT id, email, name, role, created_at FROM users WHERE id = $1',
       [req.user.id]
@@ -162,7 +158,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json({ user: result.rows[0] });
+    res.json({ user: { ...result.rows[0], tenant_id: req.user.tenant_id || null } });
   } catch (err) {
     console.error('Get user error:', err);
     res.status(500).json({ error: 'Internal server error' });

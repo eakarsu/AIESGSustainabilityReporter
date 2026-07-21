@@ -4,9 +4,9 @@ const crypto = require('crypto');
 let cachedDevSecret = null;
 function getJwtSecret() {
   const fromEnv = process.env.JWT_SECRET;
-  if (fromEnv && fromEnv.length >= 16) return fromEnv;
+  if (fromEnv && fromEnv.length >= 32 && !fromEnv.startsWith('replace-')) return fromEnv;
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('JWT_SECRET environment variable is required in production');
+    throw new Error('JWT_SECRET of at least 32 characters is required in production');
   }
   if (!cachedDevSecret) {
     cachedDevSecret = crypto.randomBytes(48).toString('hex');
