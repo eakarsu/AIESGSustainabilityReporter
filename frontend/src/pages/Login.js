@@ -92,7 +92,7 @@ const Login = ({ onLogin }) => {
             onClick={fillDemoCredentials}
             style={styles.demoButton}
           >
-            Fill Demo Credentials
+            Auto Fill Demo Credentials
           </button>
         </form>
 
