@@ -1,4 +1,8 @@
-import React, { useState } from 'react';
+
+import AIFieldPresets, { completeExample } from './AIFieldPresets';
+import AIResultView from './AIResultView';
+import * as api from '../services/api';
+import React, { useEffect, useState } from 'react';
 
 // Page that surfaces the three "new" AI endpoints exposed by
 // backend/routes/aiNew.js:
@@ -164,14 +168,79 @@ const TOOLS = [
   },
 ];
 
+const EXAMPLES = {
+  'esg-score': [{ label: 'First available report' }, { label: 'Second available report' }, { label: 'Third available report' }],
+  'regulatory-deadline-check': [
+    { label: 'EU CSRD', values: { framework: 'CSRD', jurisdiction: 'European Union' } },
+    { label: 'US climate', values: { framework: 'SEC climate disclosure', jurisdiction: 'United States' } },
+    { label: 'UK TCFD', values: { framework: 'TCFD', jurisdiction: 'United Kingdom' } },
+  ],
+  'peer-benchmark': [
+    { label: 'Manufacturing', values: { industry_sector: 'Manufacturing' } },
+    { label: 'Technology', values: { industry_sector: 'Technology' } },
+    { label: 'Financial services', values: { industry_sector: 'Financial services' } },
+  ],
+  'materiality-analysis': [
+    { label: 'Industrial operations', values: { stakeholders: 'Employees, local communities, investors, regulators', topics: 'Scope 1 emissions, worker safety, water use', industry_sector: 'Manufacturing' } },
+    { label: 'Software services', values: { stakeholders: 'Employees, customers, investors, suppliers', topics: 'Data privacy, energy use, accessibility', industry_sector: 'Technology' } },
+    { label: 'Retail supply chain', values: { stakeholders: 'Suppliers, customers, workers, investors', topics: 'Labor practices, packaging waste, transport emissions', industry_sector: 'Retail' } },
+  ],
+  'certification-roadmap': [
+    { label: 'ISO 14001', values: { target_certification: 'ISO 14001', target_date: '2027-12-31' } },
+    { label: 'B Corp', values: { target_certification: 'B Corp', target_date: '2028-06-30' } },
+    { label: 'SBTi', values: { target_certification: 'SBTi', target_date: '2028-12-31' } },
+  ],
+  'scope3-automation': [
+    { label: 'Purchased goods', values: { categories: 'Purchased goods and services, upstream transportation', supplier_count: 42 } },
+    { label: 'Business travel', values: { categories: 'Business travel, employee commuting', supplier_count: 18 } },
+    { label: 'Downstream logistics', values: { categories: 'Downstream transportation, end-of-life treatment', supplier_count: 65 } },
+  ],
+  'investor-update': [
+    { label: 'Institutional Q1', values: { quarter: 'Q1 2026', audience: 'Institutional investors' } },
+    { label: 'Board Q2', values: { quarter: 'Q2 2026', audience: 'Board of directors' } },
+    { label: 'Retail Q3', values: { quarter: 'Q3 2026', audience: 'Retail investors' } },
+  ],
+  'regulatory-tracker': [
+    { label: 'EU reporting', values: { jurisdictions: 'European Union', frameworks: 'CSRD, ESRS' } },
+    { label: 'US reporting', values: { jurisdictions: 'United States', frameworks: 'SEC climate disclosure, California SB 253' } },
+    { label: 'Global reporting', values: { jurisdictions: 'European Union, United Kingdom, United States', frameworks: 'ISSB, TCFD, CSRD' } },
+  ],
+  'circular-economy': [
+    { label: 'Electronics', values: { products: 'Office laptops, monitors', materials: 'Aluminum, plastics, circuit boards', waste_streams: 'E-waste, packaging' } },
+    { label: 'Textiles', values: { products: 'Workwear, uniforms', materials: 'Cotton, polyester', waste_streams: 'Fabric offcuts, returned garments' } },
+    { label: 'Packaging', values: { products: 'Shipping cartons, protective inserts', materials: 'Cardboard, molded pulp', waste_streams: 'Used cartons, damaged inserts' } },
+  ],
+  'net-zero-roadmap': [
+    { label: 'Manufacturing', values: { baseline_year: 2024, target_year: 2050, current_emissions: 125000, sectors: 'Manufacturing, logistics' } },
+    { label: 'Technology', values: { baseline_year: 2025, target_year: 2045, current_emissions: 18500, sectors: 'Data centers, offices' } },
+    { label: 'Retail', values: { baseline_year: 2023, target_year: 2050, current_emissions: 78000, sectors: 'Retail stores, distribution' } },
+  ],
+};
+
 export default function AINewPage() {
   const [activeId, setActiveId] = useState(TOOLS[0].id);
+  const [reports, setReports] = useState([]);
   const [form, setForm] = useState({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);
 
   const tool = TOOLS.find((t) => t.id === activeId);
+  useEffect(() => {
+    if (activeId !== 'esg-score') return;
+    let active = true;
+    api.getAll('esg-reports').then((data) => {
+      if (active) setReports(Array.isArray(data) ? data : data?.data || data?.items || []);
+    }).catch(() => { if (active) setReports([]); });
+    return () => { active = false; };
+  }, [activeId]);
+  const fields = tool.fields.map((field) => field.key === 'esg_report_id'
+    ? { ...field, requiresExistingRecord: true, options: reports.filter((report) => report.id != null).map((report) => ({ value: report.id, label: report.report_title || `Report ${report.id}` })) }
+    : field);
+  const fillExample = (sample, index) => {
+    setForm((current) => ({ ...current, ...completeExample(fields, sample, index, tool.title, current) }));
+    setError('');
+  };
 
   const setField = (key, value) =>
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -228,13 +297,6 @@ export default function AINewPage() {
     }
   };
 
-  const analysisText =
-    result?.analysis ||
-    result?.result ||
-    result?.data?.analysis ||
-    result?.data?.result ||
-    '';
-
   return (
     <div className="ai-page">
       <div className="ai-header">
@@ -273,6 +335,7 @@ export default function AINewPage() {
 
         {tool && (
           <form onSubmit={handleSubmit}>
+            <AIFieldPresets fields={fields} samples={EXAMPLES[activeId]} onFill={fillExample} disabled={loading} context={tool.title} />
             <p className="ai-description" style={{ marginTop: 0 }}>
               {tool.description}
             </p>
@@ -282,15 +345,25 @@ export default function AINewPage() {
                   {f.label}
                   {f.required ? ' *' : ''}
                 </label>
-                <input
+                {f.key === 'esg_report_id' ? <select
+                  id={`f-${f.key}`}
+                  className="form-select"
+                  value={form[f.key] ?? ''}
+                  required
+                  onChange={(e) => setField(f.key, e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="">Select an existing ESG report</option>
+                  {reports.filter((report) => report.id != null).map((report) => <option key={report.id} value={report.id}>{report.report_title || `Report ${report.id}`}</option>)}
+                </select> : <input
                   id={`f-${f.key}`}
                   className="form-select"
                   type={f.type || 'text'}
-                  value={form[f.key] || ''}
+                  value={form[f.key] ?? ''}
                   required={!!f.required}
                   onChange={(e) => setField(f.key, e.target.value)}
                   disabled={loading}
-                />
+                />}
               </div>
             ))}
             <button type="submit" className="ai-run-btn" disabled={loading}>
@@ -329,13 +402,7 @@ export default function AINewPage() {
       {result && !loading && (
         <div className="ai-result fade-in">
           <div className="ai-content">
-            {analysisText ? (
-              <pre style={{ whiteSpace: 'pre-wrap' }}>{analysisText}</pre>
-            ) : (
-              <pre style={{ whiteSpace: 'pre-wrap' }}>
-                {JSON.stringify(result, null, 2)}
-              </pre>
-            )}
+            <AIResultView response={result} title={tool.title} />
           </div>
         </div>
       )}

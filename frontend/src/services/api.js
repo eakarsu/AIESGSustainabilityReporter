@@ -77,8 +77,9 @@ export async function assuranceReadinessScore(body) {
 // AI Analysis Endpoints - POST with { id } in body
 // ---------------------------------------------------------------------------
 
-export async function analyzeEsgReport(id) {
+export async function analyzeEsgReport(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/analyze-esg-report`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -86,8 +87,9 @@ export async function analyzeEsgReport(id) {
   return handleResponse(res);
 }
 
-export async function analyzeCarbon(id) {
+export async function analyzeCarbon(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/analyze-carbon`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -95,8 +97,9 @@ export async function analyzeCarbon(id) {
   return handleResponse(res);
 }
 
-export async function analyzeSustainability(id) {
+export async function analyzeSustainability(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/analyze-sustainability`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -104,8 +107,9 @@ export async function analyzeSustainability(id) {
   return handleResponse(res);
 }
 
-export async function checkCompliance(id) {
+export async function checkCompliance(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/check-compliance`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -113,8 +117,9 @@ export async function checkCompliance(id) {
   return handleResponse(res);
 }
 
-export async function analyzeSupplyChain(id) {
+export async function analyzeSupplyChain(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/analyze-supply-chain`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -122,8 +127,9 @@ export async function analyzeSupplyChain(id) {
   return handleResponse(res);
 }
 
-export async function assessRisk(id) {
+export async function assessRisk(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/assess-risk`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -131,8 +137,9 @@ export async function assessRisk(id) {
   return handleResponse(res);
 }
 
-export async function detectGreenwashing(id) {
+export async function detectGreenwashing(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/detect-greenwashing`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -140,8 +147,9 @@ export async function detectGreenwashing(id) {
   return handleResponse(res);
 }
 
-export async function buildStakeholderReport(id) {
+export async function buildStakeholderReport(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/build-stakeholder-report`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -149,8 +157,9 @@ export async function buildStakeholderReport(id) {
   return handleResponse(res);
 }
 
-export async function validateData(id) {
+export async function validateData(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/validate-data`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -158,8 +167,9 @@ export async function validateData(id) {
   return handleResponse(res);
 }
 
-export async function analyzeClimate(id) {
+export async function analyzeClimate(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/analyze-climate`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -167,8 +177,9 @@ export async function analyzeClimate(id) {
   return handleResponse(res);
 }
 
-export async function trackBiodiversity(id) {
+export async function trackBiodiversity(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/track-biodiversity`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -176,8 +187,9 @@ export async function trackBiodiversity(id) {
   return handleResponse(res);
 }
 
-export async function optimizeWater(id) {
+export async function optimizeWater(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/optimize-water`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -185,8 +197,9 @@ export async function optimizeWater(id) {
   return handleResponse(res);
 }
 
-export async function auditEnergy(id) {
+export async function auditEnergy(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/audit-energy`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -194,8 +207,9 @@ export async function auditEnergy(id) {
   return handleResponse(res);
 }
 
-export async function measureSocial(id) {
+export async function measureSocial(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/measure-social`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),
@@ -203,8 +217,9 @@ export async function measureSocial(id) {
   return handleResponse(res);
 }
 
-export async function monitorGovernance(id) {
+export async function monitorGovernance(id, requestOptions = {}) {
   const res = await fetch(`${BASE_URL}/api/ai/monitor-governance`, {
+    ...requestOptions,
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ id }),

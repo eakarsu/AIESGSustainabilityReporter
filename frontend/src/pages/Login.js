@@ -24,8 +24,14 @@ const Login = ({ onLogin }) => {
   };
 
   const fillDemoCredentials = () => {
-    setEmail(process.env.REACT_APP_DEMO_EMAIL || '');
-    setPassword(process.env.REACT_APP_DEMO_PASSWORD || '');
+    const demoEmail = process.env.REACT_APP_DEMO_EMAIL;
+    const demoPassword = process.env.REACT_APP_DEMO_PASSWORD;
+    if (!demoEmail || !demoPassword) {
+      setError('Demo credentials are not configured for this app. Enter your account credentials to sign in.');
+      return;
+    }
+    setEmail(demoEmail);
+    setPassword(demoPassword);
     setError('');
   };
 
@@ -92,7 +98,7 @@ const Login = ({ onLogin }) => {
             onClick={fillDemoCredentials}
             style={styles.demoButton}
           >
-            Auto Fill Demo Credentials
+            Fill Demo Credentials
           </button>
         </form>
 

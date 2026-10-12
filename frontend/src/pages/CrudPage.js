@@ -1,3 +1,5 @@
+import RecordDialog from '../components/RecordDialog';
+import { AIResultValue } from './AIResultView';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAll, createItem, updateItem, deleteItem } from '../services/api';
 
@@ -335,45 +337,8 @@ function formatValue(value, fieldName) {
 // ---------------------------------------------------------------------------
 
 function renderAiAnalysis(analysis) {
-  if (!analysis) return null;
-
-  // If it's a string, parse simple markdown
-  if (typeof analysis === 'string') {
-    return <AiTextBlock text={analysis} />;
-  }
-
-  // If it's an object, render key-value sections
-  if (typeof analysis === 'object' && !Array.isArray(analysis)) {
-    return (
-      <div>
-        {Object.entries(analysis).map(([key, val]) => (
-          <div key={key} style={styles.aiSection}>
-            <h4 style={styles.aiSectionTitle}>{formatColumnHeader(key)}</h4>
-            {typeof val === 'string' ? (
-              <AiTextBlock text={val} />
-            ) : Array.isArray(val) ? (
-              <ul style={styles.aiBulletList}>
-                {val.map((item, i) => (
-                  <li key={i} style={styles.aiBulletItem}>
-                    {typeof item === 'object' ? JSON.stringify(item, null, 2) : String(item)}
-                  </li>
-                ))}
-              </ul>
-            ) : typeof val === 'number' ? (
-              <span style={styles.aiNumber}>{val.toLocaleString()}</span>
-            ) : typeof val === 'object' && val !== null ? (
-              <pre style={styles.aiPre}>{JSON.stringify(val, null, 2)}</pre>
-            ) : (
-              <span>{String(val)}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  // Fallback
-  return <pre style={styles.aiPre}>{JSON.stringify(analysis, null, 2)}</pre>;
+  if (analysis === null || analysis === undefined) return null;
+  return <AIResultValue value={analysis} />;
 }
 
 function AiTextBlock({ text }) {
@@ -906,7 +871,7 @@ export default function CrudPage({ resource, title }) {
                             ? '#ffffff'
                             : '#f9fafb';
                       }}
-                    >
+                     tabIndex={0} onKeyDown={(event) => { if ((event.key === 'Enter' || event.key === ' ') && event.target === event.currentTarget) { event.preventDefault(); (() => handleRowClick(item))(event); } }}>
                       {config.columns.map((col) => (
                         <td key={col} style={styles.td}>
                           {renderCellValue(item[col], col)}
@@ -921,13 +886,13 @@ export default function CrudPage({ resource, title }) {
 
           {/* Detail panel */}
           {selectedItem && (
-            <DetailPanel
+            <RecordDialog title={title} onClose={() => setSelectedItem(null)}><DetailPanel
               item={selectedItem}
               config={config}
               onEdit={handleEdit}
               onDelete={handleDelete}
               onClose={() => setSelectedItem(null)}
-            />
+            /></RecordDialog>
           )}
         </div>
       )}

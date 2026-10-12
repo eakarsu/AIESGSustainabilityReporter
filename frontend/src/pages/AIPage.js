@@ -1,3 +1,5 @@
+import AIResultView from './AIResultView';
+import useCancelableAI from './useCancelableAI';
 import React, { useState, useEffect, useCallback } from 'react';
 import * as api from '../services/api';
 
@@ -247,10 +249,11 @@ function parseAnalysisText(text) {
 export default function AIPage({ type, title }) {
   const [records, setRecords] = useState([]);
   const [selectedId, setSelectedId] = useState('');
-  const [loading, setLoading] = useState(false);
+  const aiRequest = useCancelableAI();
+  const { loading, result, setResult: setResult, error, setError: setError } = aiRequest;
   const [loadingRecords, setLoadingRecords] = useState(false);
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
+
+
 
   const config = TYPE_CONFIG[type];
 
@@ -262,16 +265,14 @@ export default function AIPage({ type, title }) {
       const data = await api.getAll(config.resource);
       const list = Array.isArray(data) ? data : data.data || data.items || [];
       setRecords(list);
-      if (list.length > 0 && !selectedId) {
-        setSelectedId(String(list[0].id));
-      }
+      if (list.length > 0) setSelectedId((current) => current || String(list[0].id));
     } catch {
       // silently fail -- user can still enter an ID
       setRecords([]);
     } finally {
       setLoadingRecords(false);
     }
-  }, [config, selectedId]);
+  }, [config]);
 
   useEffect(() => {
     fetchRecords();
@@ -281,26 +282,7 @@ export default function AIPage({ type, title }) {
     setSelectedId('');
   }, [type, fetchRecords]);
 
-  const handleRunAnalysis = async () => {
-    if (!config) return;
-    if (!selectedId) {
-      setError('Please select a record to analyze.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setResult(null);
-
-    try {
-      const data = await config.apiFn(selectedId);
-      setResult(data);
-    } catch (err) {
-      setError(err.message || 'AI analysis failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleRunAnalysis = async () => { if (!config) return; if (!selectedId) { setError('Please select an existing record to analyze.'); return; } return aiRequest.run((options) => config.apiFn(selectedId, options)); };
 
   if (!config) {
     return (
@@ -333,6 +315,8 @@ export default function AIPage({ type, title }) {
 
       {/* Controls */}
       <div className="ai-controls">
+        <section className="sr-presets"><div><strong>Select an existing record</strong><p>These buttons fill the analysis input with a record from your database.</p></div><div className="sr-actions">{[0, 1, 2].map((index) => <button type="button" key={index} className="btn btn-secondary" disabled={loading || !records[index]} onClick={() => { setSelectedId(String(records[index].id)); setResult(null); setError(null); }}>{["First record", "Second record", "Third record"][index]}</button>)}</div></section>
+
         <div className="ai-select-group">
           <label htmlFor="record-select">Select a record to analyze</label>
           <select
@@ -376,6 +360,7 @@ export default function AIPage({ type, title }) {
             </>
           )}
         </button>
+        {loading && <button type="button" className="btn btn-secondary" onClick={aiRequest.cancel}>Cancel</button>}
       </div>
 
       {/* Error */}
@@ -402,47 +387,7 @@ export default function AIPage({ type, title }) {
       )}
 
       {/* Result */}
-      {result && !loading && (
-        <div className="ai-result fade-in">
-          <div className="ai-result-header">
-            <div className="ai-result-badges">
-              {modelName && (
-                <span className="ai-badge ai-badge-model" title="AI Model">
-                  <span className="ai-badge-icon">&#x1F916;</span> {modelName}
-                </span>
-              )}
-              {tokenUsage && (
-                <span className="ai-badge ai-badge-tokens" title="Tokens Used">
-                  <span className="ai-badge-icon">&#x26A1;</span>{' '}
-                  {typeof tokenUsage === 'object'
-                    ? `${tokenUsage.total || tokenUsage.total_tokens || '?'} tokens`
-                    : `${tokenUsage} tokens`}
-                </span>
-              )}
-              {category && (
-                <span className="ai-badge ai-badge-category">
-                  {category}
-                </span>
-              )}
-            </div>
-            {timestamp && (
-              <span className="ai-result-time">
-                {new Date(timestamp).toLocaleString()}
-              </span>
-            )}
-          </div>
-
-          <div className="ai-content">
-            {analysisText ? (
-              parseAnalysisText(analysisText)
-            ) : (
-              <p className="ai-content-raw">
-                {JSON.stringify(result, null, 2)}
-              </p>
-            )}
-          </div>
-        </div>
-      )}
+      <AIResultView result={result} loading={loading} error={error} title={title} />
 
       {/* Empty state */}
       {!result && !loading && !error && (
