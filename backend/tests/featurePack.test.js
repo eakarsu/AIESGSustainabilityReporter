@@ -1,0 +1,9 @@
+'use strict';
+const test=require('node:test'); const assert=require('node:assert/strict');
+delete process.env.OPENROUTER_API_KEY; delete process.env.OPENAI_API_KEY;
+const d=require('../domain/featurePack');
+const rows=[{id:1,company_name:'Acme, Inc',report_title:'2024 ESG',framework:'GRI',status:'draft',environmental_score:0,social_score:10,governance_score:20},{id:2,company_name:'Beta',report_title:'2023 ESG',framework:'',status:'published',environmental_score:30,social_score:30,governance_score:30}];
+test('search/filter on main list',()=>{ assert.equal(d.filterRecords(rows,{search:'acme'}).length,1); assert.equal(d.filterRecords(rows,{status:'draft'}).length,1); assert.equal(d.filterRecords(rows,{framework:''}).length,2); assert.equal(d.filterRecords(rows,{}).length,2); });
+test('CSV/JSON export preserves 0 and empty framework',()=>{ const csv=d.toCsv(rows); assert.match(csv,/"Acme, Inc"/); assert.match(csv,/,0,10,20/); assert.equal(d.toJsonExport(rows).count,2); assert.equal(d.toJsonExport(rows).data[1].framework,''); });
+test('tasks store user-scoped, preserves false',()=>{ const s=d.createTaskStore(); const t=s.create(1,{title:'T',completed:false}); assert.equal(s.list(2).length,0); assert.equal(s.update(1,t.id,{completed:false}).completed,false); assert.equal(s.update(2,t.id,{status:'x'}),null); assert.throws(()=>s.create(1,{}),/title/); });
+test('AI fallback labelled, preserves 0 average',()=>{ const r=d.esgScoreSummary(rows); assert.equal(r.aiGenerated,false); assert.equal(r.generatedBy,'deterministic-fallback'); assert.ok(r.sections.some(s=>s.label.includes('environmental')&&s.value===15)); const e=d.esgScoreSummary([{environmental_score:0,social_score:0,governance_score:0}]); assert.ok(e.sections.some(s=>s.value===0)); const f=d.frameworkCoverage(rows); assert.ok(f.sections.some(s=>s.label.includes('(empty)'))); });

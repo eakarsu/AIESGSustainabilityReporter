@@ -44,7 +44,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api', (req, res, next) => {
-  const governed = ['/auth', '/health', '/disclosure-workflow'].some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
+  const governed = ['/auth', '/health', '/disclosure-workflow', '/feature-pack'].some((prefix) => req.path === prefix || req.path.startsWith(`${prefix}/`));
   const legacyEnabled = process.env.NODE_ENV !== 'production' && process.env.ENABLE_LEGACY_PROTOTYPE_ROUTES === 'true';
   if (governed || legacyEnabled) return next();
   return res.status(404).json({ error: 'Legacy prototype route is quarantined' });
@@ -85,6 +85,8 @@ app.use('/api/regulatory-tracker', require('./routes/regulatoryTracker'));
 app.use('/api/circular-economy', require('./routes/circularEconomy'));
 app.use('/api/assurance-readiness', require('./routes/assuranceReadiness'));
 app.use('/api/disclosure-workflow', require('./routes/disclosureWorkflow'));
+
+app.use('/api/feature-pack', require('./routes/featurePack'));
 
 // Custom views (mount BEFORE 404 / error handlers)
 app.use('/api/custom-views', require('./routes/customViews'));
